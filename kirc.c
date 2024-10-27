@@ -1265,20 +1265,17 @@ static void part_command(state l)
         strcpy(chan, "");
         return;
     }
-    tok = l->buf + sizeof("part");
-    while (*tok == ' ') {
-       tok++;
-    }
-    if (*tok == '#' || *tok == '\0') {
-        raw("PART #%s\r\n", chan);
-        printf("\x1b[35m%s\x1b[0m\r\n", l->buf);
-        printf("\x1b[35mLeft #%s!\r\n", chan);
-        printf("\x1b[35mYou need to use /join or /# to speak in a channel!\x1b[0m\r\n");
-        strcpy(chan, "");
-        return;
-    }
     printf("\x1b[35m%s\x1b[0m\r\n", l->buf);
     printf("\x1b[35mIllegal channel!\x1b[0m\r\n");
+}
+
+static void w_command(state l)
+{
+    int offset = 0;
+    while (*(l->buf + 2 + offset) == ' ') {
+        offset ++;
+    }
+    raw("whois %s\r\n", l->buf + 2 + offset);
 }
 
 static void msg_command(state l)
@@ -1291,8 +1288,25 @@ static void msg_command(state l)
     }
     raw("PRIVMSG %s :%s\r\n", l->buf + sizeof("msg") + offset, tok);
     if (memcmp(l->buf + sizeof("msg") + offset, "NickServ", sizeof("NickServ") - 1)) {
-        printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", l->buf + sizeof("msg") + offset, tok);
+        printf("\x1b[35mprivmsg %s: %s\x1b[0m\r\n", l->buf + sizeof("msg") + offset, tok);
     }
+}
+
+static void q_command(state l)
+{
+    char *tok;
+    strtok_r(l->buf + 2, " ", &tok);
+    int offset = 0;
+    while (*(l->buf + 2 + offset) == ' ') {
+        offset ++;
+    }
+    raw("privmsg %s :%s\r\n", l->buf + 2 + offset, tok);
+    if (strncmp(l->buf + 2 + offset, "NickServ", 8)) {
+        printf("\x1b[35mprivmsg %s: %s\x1b[0m\r\n", l->buf + 2 + offset, tok);
+    }
+    strcpy(chan, l->buf + 2 + offset);
+    l->nick_privmsg = 1;
+    printf("\x1b[35mnew privmsg target: %s\x1b[0m\r\n", chan);
 }
 
 static void action_command(state l)
@@ -1303,20 +1317,17 @@ static void action_command(state l)
     }
 
     raw("PRIVMSG #%s :\001ACTION %s\001\r\n", chan, l->buf + sizeof("action") + offset);
-    printf("\x1b[35mprivmsg #%s :ACTION %s\x1b[0m\r\n", chan, l->buf + sizeof("action") + offset);
+    printf("\x1b[35mprivmsg #%s: ACTION %s\x1b[0m\r\n", chan, l->buf + sizeof("action") + offset);
 }
 
-static void query_command(state l)
+static void action_me_command(state l)
 {
     int offset = 0;
-    while (*(l->buf + sizeof("query") + offset) == ' ') {
+    while (*(l->buf + 3 + offset) == ' ') {
         offset ++;
     }
-
-    strcpy(chan, l->buf + sizeof("query") + offset);
-
-    printf("\x1b[35mNew privmsg target: %s\x1b[0m\r\n", l->buf + sizeof("query") + offset);
-    l->nick_privmsg = 1;
+    raw("privmsg #%s :\001ACTION %s\001\r\n", chan, l->buf + 3 + offset);
+    printf("\x1b[35mprivmsg #%s: %s %s\x1b[0m\r\n", chan, nick, l->buf + 3 + offset);
 }
 
 
@@ -1622,46 +1633,92 @@ static void handle_user_input(state l)
     printf("\r\x1b[0K");
     switch (l->buf[0]) {
     case '/':           /* send system command */
-        if (!memcmp(l->buf + 1, "JOIN", sizeof("JOIN") - 1) || !memcmp(l->buf + 1, "join", sizeof("join") - 1)) {
+        if (!memcmp(l->buf + 1, "JOIN ", sizeof("JOIN ") - 1) ||
+            !memcmp(l->buf + 1, "join ", sizeof("join ") - 1) ||
+            !memcmp(l->buf + 1, "J ", sizeof("J ") - 1) ||
+            !memcmp(l->buf + 1, "j ", sizeof("j ") - 1)) {
             join_command(l);
             return;
         }
-        if (!memcmp(l->buf + 1, "PART", sizeof("PART") - 1) || !memcmp(l->buf + 1, "part", sizeof("part") - 1)) {
+        if (!memcmp(l->buf + 1, "PART ", sizeof("PART ") - 1) ||
+            !memcmp(l->buf + 1, "part ", sizeof("part ") - 1) ||
+            !memcmp(l->buf + 1, "P ", sizeof("P ") - 1) ||
+            !memcmp(l->buf + 1, "p ", sizeof("p ") - 1)) {
             part_command(l);
+            return;
+        }
+        if (!memcmp(l->buf + 1, "PART\0", sizeof("PART\0") - 1) ||
+            !memcmp(l->buf + 1, "part\0", sizeof("part\0") - 1) ||
+            !memcmp(l->buf + 1, "P\0", sizeof("P\0") - 1) ||
+            !memcmp(l->buf + 1, "p\0", sizeof("p\0") - 1)) {
+            if (l->nick_privmsg != 1) {
+                raw("part #%s\r\n", chan);
+                printf("\x1b[35mLeft #%s!\r\n", chan);
+                printf("\x1b[35mYou need to use /join or /# to speak in a channel!\x1b[0m\r\n");
+                strcpy(chan, "");
+            } else {
+                printf("\x1b[35mYou need to use /join or /# to speak in a channel!\x1b[0m\r\n");
+            }
             return;
         }
         if (l->buf[1] == '/') {
             raw(l->nick_privmsg ? "PRIVMSG %s :%s\r\n" :
                                   "PRIVMSG #%s :%s\r\n", chan, l->buf + 2);
-            printf(l->nick_privmsg ? "\x1b[35mprivmsg %s :%s\x1b[0m\r\n" :
-                                     "\x1b[35mprivmsg #%s :%s\x1b[0m\r\n", chan, l->buf + 2);
+            printf(l->nick_privmsg ? "\x1b[35mprivmsg %s: %s\x1b[0m\r\n": 
+                                     "\x1b[35mprivmsg #%s: %s\x1b[0m\r\n", chan, l->buf + 2);
             return;
         }
-        if (!memcmp(l->buf + 1, "MSG", sizeof("MSG") - 1) || !memcmp(l->buf + 1, "msg", sizeof("msg") - 1)) {
+        if (!memcmp(l->buf + 1, "W ", sizeof("W ") - 1) || !memcmp(l->buf + 1, "w ", sizeof("w ") - 1)) {
+            w_command(l);
+            return;
+        }
+        if (!memcmp(l->buf + 1, "WHOIS\0", sizeof("WHOIS\0") - 1) ||
+            !memcmp(l->buf + 1, "whois\0", sizeof("whois\0") - 1) ||
+            !memcmp(l->buf + 1, "W\0", sizeof("W\0") - 1) ||
+            !memcmp(l->buf + 1, "w\0", sizeof("w\0") - 1)) {
+            raw("whois %s\r\n", nick);
+            return;
+        }
+        if (!memcmp(l->buf + 1, "MSG ", sizeof("MSG ") - 1) || !memcmp(l->buf + 1, "msg ", sizeof("msg ") - 1)) {
             msg_command(l);
             return;
         }
-        if (!memcmp(l->buf + 1, "NICK", sizeof("NICK") - 1) || !memcmp(l->buf + 1, "nick", sizeof("nick") - 1)) {
+        if (!memcmp(l->buf + 1, "Q ", sizeof("Q ") - 1) || !memcmp(l->buf + 1, "q ", sizeof("q ") - 1)) {
+            q_command(l);
+            return;
+        }
+        if (!memcmp(l->buf + 1, "Q\0", sizeof("Q\0") - 1) || !memcmp(l->buf + 1, "q\0", sizeof("q\0") - 1)) {
+            raw("quit \r\n");
+            return;
+        }
+        if (!memcmp(l->buf + 1, "NICK ", sizeof("NICK ") - 1) || !memcmp(l->buf + 1, "nick ", sizeof("nick ") - 1)) {
             nick_command(l);
             return;
         }
-        if (!memcmp(l->buf + 1, "ACTION", sizeof("ACTION") - 1) || !memcmp(l->buf + 1, "action", sizeof("action") - 1)) {
+        if (!memcmp(l->buf + 1, "ACTION ", sizeof("ACTION ") - 1) || !memcmp(l->buf + 1, "action ", sizeof("action ") - 1)) {
             action_command(l);
             return;
         }
-        if (!memcmp(l->buf + 1, "QUERY", sizeof("QUERY") - 1) || !memcmp(l->buf + 1, "query", sizeof("query") - 1)) {
-            query_command(l);
+        if (!memcmp(l->buf + 1, "ME ", sizeof("ME ") - 1) || !memcmp(l->buf + 1, "me ", sizeof("me ") - 1)) {
+            action_me_command(l);
             return;
         }
+
         if (!memcmp(l->buf + 1, "DCC", sizeof("DCC") - 1) || !memcmp(l->buf + 1, "dcc", sizeof("dcc") - 1)) {
             dcc_command(l);
             return;
         }
 
+        if (l->buf[1] == '!') {
+            strcpy(chan, l->buf + 2);
+            l->nick_privmsg = 1;
+            printf("\x1b[35mnew privmsg target: %s\x1b[0m\r\n", chan);
+            return;
+        }
         if (l->buf[1] == '#') {
             strcpy(chan, l->buf + 2);
             l->nick_privmsg = 0;
-            printf("\x1b[35mnew channel: #%s\x1b[0m\r\n", chan);
+            printf("\x1b[35mnew channel target: #%s\x1b[0m\r\n", chan);
             return;
         }
         raw("%s\r\n", l->buf + 1);
@@ -1671,20 +1728,20 @@ static void handle_user_input(state l)
         strtok_r(l->buf, " ", &tok);
         if (l->buf[1] != '@') {
             raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
-            printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", l->buf + 1, tok);
+            printf("\x1b[35mprivmsg %s: %s\x1b[0m\r\n", l->buf + 1, tok);
             return;
         }
         raw("PRIVMSG %s :\001ACTION %s\001\r\n", l->buf + 2, tok);
-        printf("\x1b[35mprivmsg %s :ACTION %s\x1b[0m\r\n", l->buf + 2, tok);
+        printf("\x1b[35mprivmsg %s: ACTION %s\x1b[0m\r\n", l->buf + 2, tok);
         return;
     default:           /*  send private message to default channel */
         if(l->nick_privmsg == 0) {
             raw("PRIVMSG #%s :%s\r\n", chan, l->buf);
-            printf("\x1b[35mprivmsg #%s :%s\x1b[0m\r\n", chan, l->buf);
+            printf("\x1b[35mprivmsg #%s: %s\x1b[0m\r\n", chan, l->buf);
         }
         else {
             raw("PRIVMSG %s :%s\r\n", chan, l->buf);
-            printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", chan, l->buf);
+            printf("\x1b[35mprivmsg %s: %s\x1b[0m\r\n", chan, l->buf);
         }
         return;
     }
