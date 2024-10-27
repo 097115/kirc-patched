@@ -717,33 +717,6 @@ static void message_wrap(param p)
     }
 }
 
-static inline void param_print_nick(param p)
-{
-    printf("\x1b[35;1m%*s\x1b[0m ", p->nicklen - 4, p->nickname);
-    printf("--> \x1b[35;1m%s\x1b[0m", p->message);
-}
-
-static void param_print_part(param p)
-{
-    printf("%*s<-- \x1b[34;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
-    if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
-    }
-}
-
-static inline void param_print_quit(param p)
-{
-    printf("%*s<<< \x1b[34;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
-}
-
-static void param_print_join(param p)
-{
-    printf("%*s--> \x1b[32;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
-    if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
-    }
-}
-
 static sa_family_t parse_dcc_send_message(const char *message, char *filename, unsigned int *ip_addr, char *ipv6_addr, unsigned short *port, unsigned long long *file_size)
 {
     if (sscanf(message, "SEND \"%" STR(FNM_MAX) "[^\"]\" %" STR(INET6_ADDRSTRLEN) "s %hu %llu", filename, ipv6_addr, port, file_size) == 4) {
@@ -1174,20 +1147,12 @@ static void raw_parser(char *string)
         return;
     }
     if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1)) {
-        param_print_quit(&p);
-        printf("\x1b[0m\r\n");
         return;
     }if (!memcmp(p.command, "PART", sizeof("PART") - 1)) {
-        param_print_part(&p);
-        printf("\x1b[0m\r\n");
         return;
     }if (!memcmp(p.command, "JOIN", sizeof("JOIN") - 1)) {
-        param_print_join(&p);
-        printf("\x1b[0m\r\n");
         return;
     }if (!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
-        param_print_nick(&p);
-        printf("\x1b[0m\r\n");
         return;
     }if ((!memcmp(p.command, "PRIVMSG", sizeof("PRIVMSG") - 1)) || (!memcmp(p.command, "NOTICE", sizeof("NOTICE") - 1))) {
         filter_colors(p.message); /* this can be slow if -f is passed to kirc */
