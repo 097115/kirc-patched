@@ -84,7 +84,9 @@ static int get_columns(int ifd, int ofd)
     }
     char seq[32];
     snprintf(seq, sizeof(seq), "\x1b[%dD", cols - start);
-    write(ofd, seq, strnlen(seq, sizeof(seq)));
+    if (write(ofd, seq, strnlen(seq, 32)) < 0) {
+        return -1;
+    }
     return cols;
 }
 
