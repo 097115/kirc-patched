@@ -727,12 +727,20 @@ static void message_wrap(param p)
                 printf(" ");
                 len++;
             }
-            // ...and the current token
-            printf("%s", tok);
+            // ...and the current token (highlight if it's an URL)
+            if (strncmp(tok, "http", 4) == 0) {
+                printf("\x1b[34;1m%s\x1b[0m", tok);
+            } else {
+                printf("%s", tok);
+            }
         // otherwise...
         } else {
-            // ...indent, then print the current token...
-            printf("\r\n%*.s%s", (int)p->nicklen + 1, " ", tok);
+            // ...indent, then print the current token (highlight if it's an URL)...
+            if (strncmp(tok, "http", 4) == 0) {
+                printf("\r\n%*.s\x1b[34;1m%s\x1b[0m", (int)p->nicklen + 1, " ", tok);
+            } else {
+                printf("\r\n%*.s%s", (int)p->nicklen + 1, " ", tok);
+            }
             // ...re-set spaceleft
             // (next line won't have prefixes produced by param_print_channel, param_print_private)
             spaceleft = p->maxcols - (p->nicklen + 1);
