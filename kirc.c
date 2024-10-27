@@ -200,9 +200,9 @@ static void refresh_line(state l)
         txtlenb += u8_next(buf + txtlenb, 0);
     }
     ab.len = 0;
-    ab_append(&ab, "\r", sizeof("\r") - 1);
+    ab_append(&ab, "\r\x1b[32;1m", sizeof("\r\x1b[32;1m") - 1);
     ab_append(&ab, chan, l->plenb);
-    ab_append(&ab, "> ", sizeof("> ") - 1);
+    ab_append(&ab, "> \x1b[0m", sizeof("> \x1b[0m") - 1);
     ab_append(&ab, buf, txtlenb);
     ab_append(&ab, "\x1b[0K", sizeof("\x1b[0K") - 1);
     if (posu8 + plenu8) {
@@ -1080,7 +1080,7 @@ static void param_print_private(param p)
         }
         snprintf(buf, sizeof(buf), "%d] ", timeinfo->tm_min);
         strcat(timestamp, buf);
-        printf("%s", timestamp);
+        printf("\x1b[32m%s\x1b[0m", timestamp);
     }
     int s = 0;
     if (strnlen(p->nickname, MSG_MAX) <= (size_t)p->nicklen + strnlen(timestamp, sizeof(timestamp))) {
