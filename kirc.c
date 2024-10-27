@@ -702,18 +702,43 @@ static void message_wrap(param p)
     if (!p->message) {
         return;
     }
-    char *tok;
+
     size_t spaceleft = p->maxcols - (p->nicklen + p->offset);
+
+    const char *tok;
+    const char *prv;
+    const char *cur;
+    cur = p->message;
+    size_t len = 0;
+
+    // iterate message by tokens (words)
     for (tok = strtok(p->message, " "); tok != NULL; tok = strtok(NULL, " ")) {
-        size_t wordwidth, spacewidth = 1;
-        wordwidth = strnlen(tok, MSG_MAX);
-        if ((wordwidth + spacewidth) > spaceleft) {
-            printf("\r\n%*.s%s ", (int)p->nicklen + 1, " ", tok);
-            spaceleft = p->maxcols - (p->nicklen + 1);
+        // collect the tokens' length
+        len += strlen(tok);
+        // save the previous token
+        prv = cur;
+        // measure the current token
+        cur = tok + strlen(tok);
+        // if the number of spaces between the previous and the current tokens
+        // and the current token itself fit the current line...
+        if (cur - prv - strlen(tok) + len < spaceleft) {
+            // ...then, print the mentioned number of spaces...
+            for (size_t i = 0; i < cur - prv - strlen(tok); i++) {
+                printf(" ");
+                len++;
+            }
+            // ...and the current token
+            printf("%s", tok);
+        // otherwise...
         } else {
-            printf("%s ", tok);
+            // ...indent, then print the current token...
+            printf("\r\n%*.s%s", (int)p->nicklen + 1, " ", tok);
+            // ...re-set spaceleft
+            // (next line won't have prefixes produced by param_print_channel, param_print_private)
+            spaceleft = p->maxcols - (p->nicklen + 1);
+            // ...and re-set the tokens' length
+            len = strlen(tok);
         }
-        spaceleft -= wordwidth + spacewidth;
     }
 }
 
