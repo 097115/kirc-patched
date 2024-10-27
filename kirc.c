@@ -628,17 +628,7 @@ static void log_append(char *str, char *path)
         print_error("logging back on");
     }
     ctime_now(buf);
-    char _o_str[MSG_MAX + 1]; /* str is at most this big */
-    char *o_str = _o_str;
-    while(*str != '\0') {
-        if ((*str >= 32 && *str < 127) || *str == '\n') {
-            *o_str = *str;
-            o_str++;
-        }
-        str++;
-    }
-    *o_str = '\0';
-    fprintf(out, "%s:%s", buf, _o_str);
+    fprintf(out, "%s:%s", buf, str);
     fclose(out);
 }
 
@@ -1097,6 +1087,9 @@ static void param_print_channel(param p)
 
 static void raw_parser(char *string)
 {
+    if (olog) {
+        log_append(string, olog);
+    }
     int len = strlen(string);
     int dim = 0;
     char *_str1 = malloc(len + 1);
@@ -1151,9 +1144,6 @@ static void raw_parser(char *string)
     printf("\r\x1b[0K");
     if (verb) {
         printf(">> %s", string);
-    }
-    if (olog) {
-        log_append(string, olog);
     }
     param_t p = {
         .prefix = strtok(string, " ") + 1,
