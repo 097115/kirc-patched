@@ -45,7 +45,7 @@ Specifies the PASS connection password
 .BI \-a " auth"
 Specifies SASL PLAIN mechanism authentication token
 .TP
-.BI \-D " dir"
+.BI \-D " dir	"
 Specifies DCC download directory
 .TP
 .BI \-o " logfile"
@@ -60,9 +60,6 @@ Connect via ipv6 only
 .BI \-d
 Toggle DCC support
 .TP
-.BI \-f
-Filter ansi color codes
-.TP
 .BI \-e
 Specifies SASL EXTERNAL mechanism
 .TP
@@ -71,7 +68,7 @@ Reads from STDIN and passes each line (delimited by "\\n") as a command to the I
 server after the initial connection.
 .TP
 .BI \-v
-Prints the version information to stderr, then exits
+Prints version information to stderr, then exits
 .TP
 .BI \-V
 Increases verbosity. Causes raw IRC messages to be printed when sent or
@@ -81,40 +78,73 @@ received.
 .BI /<command>
 Send message to IRC host (e.g. /JOIN, /PART, /WHOIS, etc.)
 .TP
-.BI /query " <nick>"
-Set privmsg target. Useful when sending privmsg's to a nick instead of a chan.
+.BI /<#channel>
+Set default destination to
+.I
+<channel>
 .TP
-.BI // " <text>"
-Send text to current channel (useful when sending '@' and '/', usually to bots)
-.TP
-.BI /#<channel>
-Set default message channel to <channel>
+.BI /<!nick>
+Set default destination to
+.I <nick>
 .TP
 .BI <message>
-Send PRIVMSG to default message channel with <message> as the content
+Send
+.I <message> 
+to default destination
 .TP
-.BI @<channel|nick> " <message>"
+.BI //<message>
 Send
 .I <message>
-to specified
+to default destination. Useful when
+.I <message>
+starts with special characters (e.g. @ or / ), usually to bots
+.TP
+.BI @<#channel|nick> " <message>"
+Send
+.I <message>
+to
 .I <channel>
 or
 .I <nick>
 .TP
-.BI /action <channel|nick> " <message>"
-Send CTCP ACTION containing
+.BI /action|me " [<#channel|nick>] <message>"
+Send ACTION containing
 .I <message>
-to specified
+to
 .I <channel>
 or
-.I <nick>
-(if no 
+.I <nick>\fR. If no
 .I <channel> 
-or 
+or
 .I <nick> 
-is specified, the 
+is specified,
 .I <message> 
-will be sent to the default message channel)
+will be sent to default destination
+.SH ALIASES
+.TP
+.BI /j " <#channel>"
+Run /JOIN 
+.I
+<#channel>
+.TP
+.BI /p " <#channel>"
+Run /PART 
+.I
+<#channel>
+.TP
+.BI /w " <nick>"
+Run /WHOIS 
+.I
+<nick>
+.TP
+.BI /q " <nick> <message>"
+Send
+.I <message> 
+to
+.I <nick>
+and / or set default destination to
+.I <nick>\fR (i.e. open a query with \fI<nick>\fR)
+
 .SH AUTHOR
 Michael Czigler <michaelczigler at icloud dot com>
 .SH BUGS
