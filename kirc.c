@@ -697,7 +697,7 @@ static int connection_initialize(void)
     return 0;
 }
 
-static void message_wrap(param p)
+static void message_wrap(param p, int dim)
 {
     if (!p->message) {
         return;
@@ -709,10 +709,14 @@ static void message_wrap(param p)
     const char *prv;
     const char *cur;
     cur = p->message;
+    int first = 1;
     size_t len = 0;
+    if (dim == 1) {
+        printf("\x1b[38;2;88;88;88m");
+    }
 
-    // iterate message by tokens (words)
-    for (tok = strtok(p->message, " "); tok != NULL; tok = strtok(NULL, " ")) {
+    // iterate message by tokens (words), separated by spaces and other characters
+    for (tok = strtok(p->message, " \t"); tok != NULL; tok = strtok(NULL, " ")) {
         // collect the tokens' length
         len += strlen(tok);
         // save the previous token
@@ -722,7 +726,17 @@ static void message_wrap(param p)
         // if the number of spaces between the previous and the current tokens
         // and the current token itself fit the current line...
         if (cur - prv - strlen(tok) + len < spaceleft) {
-            // ...then, print the mentioned number of spaces...
+            // ...then
+            // if it's the dimmed message that is iterated, and this is the first token,
+            // just print the token with no spaces,
+            // reset the first marker and skip to the next iteration
+            if (dim == 1 && first == 1) {
+                printf("%s", tok);
+                first = 0;
+                continue;
+            }
+            // ...or, if that's not the case, continue and
+            // print the mentioned number of spaces...
             for (size_t i = 0; i < cur - prv - strlen(tok); i++) {
                 printf(" ");
                 len++;
@@ -733,7 +747,7 @@ static void message_wrap(param p)
             } else {
                 printf("%s", tok);
             }
-        // otherwise...
+        // ...otherwise...
         } else {
             // ...indent, then print the current token (highlight if it's an URL)...
             if (strncmp(tok, "http", 4) == 0) {
@@ -747,6 +761,9 @@ static void message_wrap(param p)
             // ...and re-set the tokens' length
             len = strlen(tok);
         }
+    }
+    if (dim == 1) {
+        printf("\x1b[0m");
     }
 }
 
@@ -1018,45 +1035,6 @@ static void handle_ctcp(param p)
     }
 }
 
-static void filter_colors(char *string)
-{
-    if (!filter || !string) {
-        return;
-    }
-    char _str1[MSG_MAX + 1]; /* string is at most this large */
-    char *str1 = _str1;
-    char *str = string;
-    while(*str) {
-        if (*str != '\003' && *str != '\004') {
-            *str1 = *str;
-            str1++;
-            str++;
-            continue;
-        }
-        /* color codes are ^Cxx,yy */
-        /* xx and yy are numbers, either 1 or 2 digits */
-        /* the ,yy part is optional */
-        str++;
-        char *p = str;
-        while (*p && *p != ',' && *p >= '0' && *p <= '9' && p < str + 2) {
-            p++;
-        }
-        str = p;
-        if (*str != ',') {
-            continue;
-        }
-        str++;
-        p = str;
-        while (*p && *p >= '0' && *p <= '9' && p < str + 2) {
-            p++;
-        }
-        str = p;
-    }
-    *str1 = '\0';
-    memcpy(string, _str1, str1 - _str1 + 1);
-    return;
-}
-
 static void param_print_private(param p)
 {
     time_t rawtime;
@@ -1119,6 +1097,49 @@ static void param_print_channel(param p)
 
 static void raw_parser(char *string)
 {
+    int len = strlen(string);
+    int dim = 0;
+    char *_str1 = malloc(len + 1);
+    char *str1 = _str1;
+    char *str = string;
+    while(*str) {
+        if (*str == 3 || *str == 4) {
+            dim = 1;
+            /* color codes are ^Cxx,yy */
+            /* xx and yy are numbers, either 1 or 2 digits */
+            /* the ,yy part is optional */
+            /* I also notiuced that sometimes, color codes are terminated with '\267' */
+            str++;
+            char *p = str;
+            while (*p && *p != ',' && *p >= '0' && *p <= '9' && p < str + 2) {
+                p++;
+                len--;
+            }
+            str = p;
+            if (*str != ',') {
+                continue;
+            }
+            str++;
+            p = str;
+            while (*p && *p >= '0' && *p <= '9' && p < str + 2) {
+                p++;
+                len--;
+            }
+            str = p;
+            if (*str != '\267') {
+                continue;
+            }
+            str++;
+            continue;
+        }
+        *str1 = *str;
+        str1++;
+        str++;
+    }
+    *str1 = '\0';
+    memcpy(string, _str1, len + 1);
+    free(_str1);
+
     if (!memcmp(string, "PING", sizeof("PING") - 1)) {
         string[1] = 'O';
         raw("%s\r\n", string);
@@ -1188,14 +1209,13 @@ static void raw_parser(char *string)
     }if (!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
         return;
     }if ((!memcmp(p.command, "PRIVMSG", sizeof("PRIVMSG") - 1)) || (!memcmp(p.command, "NOTICE", sizeof("NOTICE") - 1))) {
-        filter_colors(p.message); /* this can be slow if -f is passed to kirc */
         param_print_private(&p);
-        message_wrap(&p);
+        message_wrap(&p, dim);
         printf("\x1b[0m\r\n");
         return;
     }
     param_print_channel(&p);
-    message_wrap(&p);
+    message_wrap(&p, dim);
     printf("\x1b[0m\r\n");
 }
 
@@ -1856,9 +1876,6 @@ int main(int argc, char **argv)
             break;
         case 'd':
             dcc = 1;
-            break;
-        case 'f':
-            filter = 1;
             break;
         case 's':
             host = optarg;
